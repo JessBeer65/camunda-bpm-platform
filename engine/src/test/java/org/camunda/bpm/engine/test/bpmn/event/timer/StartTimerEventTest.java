@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2018 camunda services GmbH and various authors (info@camunda.com)
+ * Copyright © 2013-2019 camunda services GmbH and various authors (info@camunda.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package org.camunda.bpm.engine.test.bpmn.event.timer;
+
+import static org.junit.Assert.assertNotEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -194,6 +196,39 @@ public class StartTimerEventTest extends PluggableProcessEngineTestCase {
     executeAllJobs();
 
     List<ProcessInstance> pi = runtimeService.createProcessInstanceQuery().processDefinitionKey("startTimerEventExample").list();
+    assertEquals(1, pi.size());
+
+    assertEquals(0, jobQuery.count());
+  }
+  
+  @Deployment
+  public void testRecalculateExpressionStartTimerEvent() throws Exception {
+    // given
+    JobQuery jobQuery = managementService.createJobQuery();
+    ProcessInstanceQuery processInstanceQuery = runtimeService.createProcessInstanceQuery().processDefinitionKey("startTimerEventExample");
+    assertEquals(1, jobQuery.count());
+    assertEquals(0, processInstanceQuery.count());
+    
+    Job job = jobQuery.singleResult();
+    Date oldDate = job.getDuedate();
+    
+    // when
+    moveByMinutes(1);
+    managementService.recalculateJobDuedate(job.getId());
+    
+    // then
+    assertEquals(1, jobQuery.count());
+    assertEquals(0, processInstanceQuery.count());
+    
+    Date newDate = jobQuery.singleResult().getDuedate();
+    assertNotEquals(oldDate, newDate);
+    assertTrue(oldDate.before(newDate));
+
+    // move the clock forward 2 hours and 1 minute
+    moveByMinutes((60 * 2) + 1);
+    executeAllJobs();
+
+    List<ProcessInstance> pi = processInstanceQuery.list();
     assertEquals(1, pi.size());
 
     assertEquals(0, jobQuery.count());
@@ -1278,6 +1313,44 @@ public class StartTimerEventTest extends PluggableProcessEngineTestCase {
     managementService.executeJob(jobId);
 
     // then
+    assertEquals(1, taskService.createTaskQuery().taskName("taskInSubprocess").list().size());
+  }
+  
+  public void testRecalculateNonInterruptingWithDurationExpressionInEventSubprocess() throws Exception {
+    // given
+    ProcessBuilder processBuilder = Bpmn.createExecutableProcess("process");
+
+    BpmnModelInstance modelInstance = processBuilder
+      .startEvent()
+        .userTask()
+      .endEvent().done();
+
+    processBuilder.eventSubProcess()
+      .startEvent().interrupting(false).timerWithDuration("${duration}")
+        .userTask("taskInSubprocess")
+      .endEvent();
+
+    deploymentId = repositoryService.createDeployment()
+      .addModelInstance("process.bpmn", modelInstance).deploy()
+      .getId();
+
+    runtimeService.startProcessInstanceByKey("process", 
+        Variables.createVariables().putValue("duration", "PT60S"));
+    
+    JobQuery jobQuery = managementService.createJobQuery();
+    Job job = jobQuery.singleResult();
+    String jobId = job.getId();
+    Date oldDueDate = job.getDuedate();
+    
+    // when
+    moveByMinutes(1);
+    managementService.recalculateJobDuedate(jobId);
+
+    // then
+    assertEquals(1L, jobQuery.count());
+    assertNotEquals(oldDueDate, jobQuery.singleResult().getDuedate());
+    
+    managementService.executeJob(jobId);
     assertEquals(1, taskService.createTaskQuery().taskName("taskInSubprocess").list().size());
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2018 camunda services GmbH and various authors (info@camunda.com)
+ * Copyright © 2013-2019 camunda services GmbH and various authors (info@camunda.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,10 @@ public interface JobResource {
   @Path("/duedate")
   @Consumes(MediaType.APPLICATION_JSON)
   void setJobDuedate(JobDuedateDto dto);
+  
+  @POST
+  @Path("/recalculate-duedate")
+  void recalculateDuedate();
 
   @PUT
   @Path("/suspended")

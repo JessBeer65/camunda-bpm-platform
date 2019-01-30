@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2018 camunda services GmbH and various authors (info@camunda.com)
+ * Copyright © 2013-2019 camunda services GmbH and various authors (info@camunda.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,6 +95,19 @@ public class TimerDeclarationImpl extends JobDeclaration<ExecutionEntity, TimerE
   }
 
   protected void initializeConfiguration(ExecutionEntity context, TimerEntity job) {
+    String dueDateString = resolveAndSetDuedate(context, job);
+
+    if (type == TimerDeclarationType.CYCLE && jobHandlerType != TimerCatchIntermediateEventJobHandler.TYPE) {
+
+      // See ACT-1427: A boundary timer with a cancelActivity='true', doesn't need to repeat itself
+      if (!isInterruptingTimer) {
+        String prepared = prepareRepeat(dueDateString);
+        job.setRepeat(prepared);
+      }
+    }
+  }
+
+  public String resolveAndSetDuedate(ExecutionEntity context, TimerEntity job) {
     BusinessCalendar businessCalendar = Context
         .getProcessEngineConfiguration()
         .getBusinessCalendarManager()
@@ -130,15 +143,7 @@ public class TimerDeclarationImpl extends JobDeclaration<ExecutionEntity, TimerE
     }
 
     job.setDuedate(duedate);
-
-    if (type == TimerDeclarationType.CYCLE && jobHandlerType != TimerCatchIntermediateEventJobHandler.TYPE) {
-
-      // See ACT-1427: A boundary timer with a cancelActivity='true', doesn't need to repeat itself
-      if (!isInterruptingTimer) {
-        String prepared = prepareRepeat(dueDateString);
-        job.setRepeat(prepared);
-      }
-    }
+    return dueDateString;
   }
 
   protected void postInitialize(ExecutionEntity execution, TimerEntity timer) {

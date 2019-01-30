@@ -1,5 +1,5 @@
 /*
- * Copyright © 2013-2018 camunda services GmbH and various authors (info@camunda.com)
+ * Copyright © 2013-2019 camunda services GmbH and various authors (info@camunda.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package org.camunda.bpm.engine.test.bpmn.event.timer;
 
+import static org.junit.Assert.assertNotEquals;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -25,7 +27,9 @@ import org.camunda.bpm.engine.impl.util.ClockUtil;
 import org.camunda.bpm.engine.runtime.Job;
 import org.camunda.bpm.engine.runtime.JobQuery;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.camunda.bpm.engine.runtime.ProcessInstanceWithVariables;
 import org.camunda.bpm.engine.test.Deployment;
+import org.joda.time.LocalDateTime;
 
 
 public class IntermediateTimerEventTest extends PluggableProcessEngineTestCase {
@@ -77,6 +81,37 @@ public class IntermediateTimerEventTest extends PluggableProcessEngineTestCase {
 
     assertProcessEnded(pi1.getProcessInstanceId());
     assertProcessEnded(pi2.getProcessInstanceId());
+  }
+  
+  @Deployment(resources = "org/camunda/bpm/engine/test/bpmn/event/timer/IntermediateTimerEventTest.testExpression.bpmn20.xml")
+  public void testExpressionRecalculate() {
+    // Set the clock fixed
+    HashMap<String, Object> variables1 = new HashMap<String, Object>();
+    Date firstDate = new Date();
+    variables1.put("dueDate", firstDate);
+
+    // After process start, there should be timer created
+    ProcessInstanceWithVariables pi1 = (ProcessInstanceWithVariables) runtimeService.startProcessInstanceByKey("intermediateTimerEventExample", variables1);
+    JobQuery jobQuery = managementService.createJobQuery().processInstanceId(pi1.getId());
+    assertEquals(1, jobQuery.count());
+    assertEquals(firstDate, jobQuery.singleResult().getDuedate());
+
+    // After variable change and recalculation, there should still be one timer only, with a changed due date
+    Date secondDate = LocalDateTime.now().plusSeconds(10).toDate();
+    runtimeService.setVariable(pi1.getProcessInstanceId(), "dueDate", secondDate);
+    Job timerJob = jobQuery.singleResult();
+    processEngine.getManagementService().recalculateJobDuedate(timerJob.getId());
+    
+    assertEquals(1, jobQuery.count());
+    assertNotEquals(firstDate, jobQuery.singleResult().getDuedate());
+    assertEquals(secondDate, jobQuery.singleResult().getDuedate());
+    
+    // After waiting for fifteen seconds the timer should fire
+    ClockUtil.setCurrentTime(new Date(firstDate.getTime() + ((10 * 1000) + 5000)));
+    waitForJobExecutorToProcessAllJobs(5000L);
+
+    assertEquals(0, managementService.createJobQuery().processInstanceId(pi1.getId()).count());
+    assertProcessEnded(pi1.getProcessInstanceId());
   }
 
   @Deployment
