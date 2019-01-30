@@ -20,6 +20,7 @@ import static org.junit.Assert.assertNotEquals;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.camunda.bpm.engine.impl.test.PluggableProcessEngineTestCase;
 import org.camunda.bpm.engine.impl.util.ClockUtil;
@@ -124,11 +125,7 @@ public class BoundaryTimerEventTest extends PluggableProcessEngineTestCase {
     Date oldDate = job.getDuedate();
     
     // After recalculation of the timer, the job's duedate should be changed
-    try {
-      Thread.sleep(500);
-    } catch (Exception e) {
-      // OK
-    }
+    ClockUtil.setCurrentTime(new Date(startTime.getTime() + TimeUnit.SECONDS.toMillis(5)));
     managementService.recalculateJobDuedate(job.getId());
     Job jobUpdated = jobQuery.singleResult();
     assertEquals(job.getId(), jobUpdated.getId());
@@ -136,7 +133,7 @@ public class BoundaryTimerEventTest extends PluggableProcessEngineTestCase {
     assertTrue(oldDate.before(jobUpdated.getDuedate()));
 
     // After setting the clock to time '1 hour and 15 seconds', the second timer should fire
-    ClockUtil.setCurrentTime(new Date(startTime.getTime() + ((60 * 60 * 1000) + 15000)));
+    ClockUtil.setCurrentTime(new Date(startTime.getTime() + TimeUnit.HOURS.toMillis(1L) + TimeUnit.SECONDS.toMillis(15L)));
     waitForJobExecutorToProcessAllJobs(5000L);
     assertEquals(0L, jobQuery.count());
 

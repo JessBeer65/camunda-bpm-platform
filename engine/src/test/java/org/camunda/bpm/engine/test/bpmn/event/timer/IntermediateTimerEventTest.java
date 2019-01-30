@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.camunda.bpm.engine.impl.test.PluggableProcessEngineTestCase;
 import org.camunda.bpm.engine.impl.util.ClockUtil;
@@ -107,7 +108,7 @@ public class IntermediateTimerEventTest extends PluggableProcessEngineTestCase {
     assertEquals(secondDate, jobQuery.singleResult().getDuedate());
     
     // After waiting for fifteen seconds the timer should fire
-    ClockUtil.setCurrentTime(new Date(firstDate.getTime() + ((10 * 1000) + 5000)));
+    ClockUtil.setCurrentTime(new Date(firstDate.getTime() + TimeUnit.SECONDS.toMillis(15L)));
     waitForJobExecutorToProcessAllJobs(5000L);
 
     assertEquals(0, managementService.createJobQuery().processInstanceId(pi1.getId()).count());

@@ -225,7 +225,7 @@ public class StartTimerEventTest extends PluggableProcessEngineTestCase {
     assertTrue(oldDate.before(newDate));
 
     // move the clock forward 2 hours and 1 minute
-    moveByMinutes((60 * 2) + 1);
+    moveByMinutes(121);
     executeAllJobs();
 
     List<ProcessInstance> pi = processInstanceQuery.list();
